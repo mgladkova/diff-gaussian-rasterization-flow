@@ -3,7 +3,7 @@
  * GRAPHDECO research group, https://team.inria.fr/graphdeco
  * All rights reserved.
  *
- * This software is free for non-commercial, research and evaluation use 
+ * This software is free for non-commercial, research and evaluation use
  * under the terms of the LICENSE.md file.
  *
  * For inquiries contact  george.drettakis@inria.fr
@@ -65,7 +65,7 @@ __global__ void checkFrustum(int P,
 	present[idx] = in_frustum(idx, orig_points, viewmatrix, projmatrix, false, p_view);
 }
 
-// Generates one key/value pair for all Gaussian / tile overlaps. 
+// Generates one key/value pair for all Gaussian / tile overlaps.
 // Run once per Gaussian (1:N mapping).
 __global__ void duplicateWithKeys(
 	int P,
@@ -90,11 +90,11 @@ __global__ void duplicateWithKeys(
 
 		getRect(points_xy[idx], radii[idx], rect_min, rect_max, grid);
 
-		// For each tile that the bounding rect overlaps, emit a 
+		// For each tile that the bounding rect overlaps, emit a
 		// key/value pair. The key is |  tile ID  |      depth      |,
-		// and the value is the ID of the Gaussian. Sorting the values 
+		// and the value is the ID of the Gaussian. Sorting the values
 		// with this key yields Gaussian IDs in a list, such that they
-		// are first sorted by tile and then by depth. 
+		// are first sorted by tile and then by depth.
 		for (int y = rect_min.y; y < rect_max.y; y++)
 		{
 			for (int x = rect_min.x; x < rect_max.x; x++)
@@ -110,8 +110,8 @@ __global__ void duplicateWithKeys(
 	}
 }
 
-// Check keys to see if it is at the start/end of one tile's range in 
-// the full sorted list. If yes, write start/end of this tile. 
+// Check keys to see if it is at the start/end of one tile's range in
+// the full sorted list. If yes, write start/end of this tile.
 // Run once per instanced (duplicated) Gaussian ID.
 __global__ void identifyTileRanges(int L, uint64_t* point_list_keys, uint2* ranges)
 {
@@ -162,6 +162,7 @@ CudaRasterizer::GeometryState CudaRasterizer::GeometryState::fromChunk(char*& ch
 	obtain(chunk, geom.cov3D, P * 6, 128);
 	obtain(chunk, geom.conic_opacity, P, 128);
 	obtain(chunk, geom.rgb, P * 3, 128);
+	obtain(chunk, geom.semantic_feature, P * NUM_SEMANTIC_CHANNELS, 128);
 	obtain(chunk, geom.tiles_touched, P, 128);
 	cub::DeviceScan::InclusiveSum(nullptr, geom.scan_size, geom.tiles_touched, geom.tiles_touched, P);
 	obtain(chunk, geom.scanning_space, geom.scan_size, 128);
@@ -204,6 +205,7 @@ int CudaRasterizer::Rasterizer::forward(
 	const float* means3D,
 	const float* shs,
 	const float* colors_precomp,
+	const float* semantic_feature,
 	const float* opacities,
 	const float* scales,
 	const float scale_modifier,
@@ -215,7 +217,8 @@ int CudaRasterizer::Rasterizer::forward(
 	const float tan_fovx, float tan_fovy,
 	const bool prefiltered,
 	float* out_color,
-	float* out_depth, 
+	float* out_feature_map,
+	float* out_depth,
 	float* out_alpha,
 	float* proj_2D,
 	float* conic_2D,
@@ -296,7 +299,7 @@ int CudaRasterizer::Rasterizer::forward(
 	char* binning_chunkptr = binningBuffer(binning_chunk_size);
 	BinningState binningState = BinningState::fromChunk(binning_chunkptr, num_rendered);
 
-	// For each instance to be rendered, produce adequate [ tile | depth ] key 
+	// For each instance to be rendered, produce adequate [ tile | depth ] key
 	// and corresponding dublicated Gaussian indices to be sorted
 	duplicateWithKeys << <(P + 255) / 256, 256 >> > (
 		P,
@@ -338,18 +341,21 @@ int CudaRasterizer::Rasterizer::forward(
 		width, height,
 		geomState.means2D,
 		feature_ptr,
+		semantic_feature,
 		geomState.depths,
 		geomState.conic_opacity,
 		out_alpha,
 		imgState.n_contrib,
 		background,
 		out_color,
+		out_feature_map,
 		out_depth,
 		proj_2D,
 		conic_2D,
 		gs_per_pixel,
 		weight_per_gs_pixel,
-		x_mu), debug);
+		x_mu
+	), debug);
 
 	return num_rendered;
 }
@@ -363,6 +369,7 @@ void CudaRasterizer::Rasterizer::backward(
 	const float* means3D,
 	const float* shs,
 	const float* colors_precomp,
+	const float* semantic_feature,
 	const float* alphas,
 	const float* scales,
 	const float scale_modifier,
@@ -377,12 +384,14 @@ void CudaRasterizer::Rasterizer::backward(
 	char* binning_buffer,
 	char* img_buffer,
 	const float* dL_dpix,
+	const float* dL_dfeaturepix,
 	const float* dL_dpix_depth,
 	const float* dL_dalphas,
 	float* dL_dmean2D,
 	float* dL_dconic,
 	float* dL_dopacity,
 	float* dL_dcolor,
+	float* dL_dsemantic_feature,
 	float* dL_ddepth,
 	float* dL_proj_2D,
 	float* dL_conic_2D,
@@ -427,16 +436,19 @@ void CudaRasterizer::Rasterizer::backward(
 		geomState.means2D,
 		geomState.conic_opacity,
 		color_ptr,
+		semantic_feature,
 		depth_ptr,
 		alphas,
 		imgState.n_contrib,
 		dL_dpix,
+		dL_dfeaturepix,
 		dL_dpix_depth,
 		dL_dalphas,
 		(float3*)dL_dmean2D,
 		(float4*)dL_dconic,
 		dL_dopacity,
 		dL_dcolor,
+		dL_dsemantic_feature,
 		dL_ddepth,
 		dL_proj_2D,
 		dL_conic_2D,

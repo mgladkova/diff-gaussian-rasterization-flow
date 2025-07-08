@@ -3,7 +3,7 @@
  * GRAPHDECO research group, https://team.inria.fr/graphdeco
  * All rights reserved.
  *
- * This software is free for non-commercial, research and evaluation use 
+ * This software is free for non-commercial, research and evaluation use
  * under the terms of the LICENSE.md file.
  *
  * For inquiries contact  george.drettakis@inria.fr
@@ -60,12 +60,14 @@ namespace FORWARD
 		int W, int H,
 		const float2* points_xy_image,
 		const float* features,
+		const float* semantic_feature,
 		const float* depths,
 		const float4* conic_opacity,
 		float* out_alpha,
 		uint32_t* n_contrib,
 		const float* bg_color,
 		float* out_color,
+		float* out_feature_map,
 		float* out_depth,
 		float* proj_2D,
 		float* conic_2D,

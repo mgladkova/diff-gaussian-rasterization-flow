@@ -190,7 +190,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
   torch::Tensor dL_dsh = torch::zeros({P, M, 3}, means3D.options());
   torch::Tensor dL_dscales = torch::zeros({P, 3}, means3D.options());
   torch::Tensor dL_drotations = torch::zeros({P, 4}, means3D.options());
-  torch::Tensor dL_dsemantic_feature = torch::zeros({P, semantic_feature.size(1), NUM_SEMANTIC_CHANNELS}, means3D.options()); /***/
+  torch::Tensor dL_dsemantic_feature = torch::zeros({P, 1, NUM_SEMANTIC_CHANNELS}, means3D.options()); /**semantic_feature.size(1)*/
 
   if(P != 0)
   {

@@ -500,7 +500,6 @@ renderCUDA(
 	const int last_contributor = inside ? n_contrib[pix_id] : 0;
 
 	float accum_rec[C] = { 0 };
-	float accum_semantic_feature_rec[NUM_SEMANTIC_CHANNELS] = { 0 };
 	float dL_dpixel[C];
 	float accum_depth_rec = 0;
 	float dL_dpixel_depth;
